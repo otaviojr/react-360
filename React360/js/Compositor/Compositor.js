@@ -10,6 +10,7 @@
  */
 
 import * as THREE from 'three';
+import AnaglyphEffect from './Environment/AnaglyphEffect';
 import {type Quaternion, type Ray, type Vec3} from '../Controls/Types';
 import createRemoteImageManager from '../Utils/createRemoteImageManager';
 import type ResourceManager from '../Utils/ResourceManager';
@@ -23,8 +24,11 @@ const LEFT = 'left';
 const RIGHT = 'right';
 
 const leftCamera = new THREE.PerspectiveCamera();
+leftCamera.layers.enable(1);
 leftCamera.matrixAutoUpdate = false;
+
 const rightCamera = new THREE.PerspectiveCamera();
+rightCamera.layers.enable(2);
 rightCamera.matrixAutoUpdate = false;
 
 export default class Compositor {
@@ -42,6 +46,7 @@ export default class Compositor {
   _surfaces: {[name: string]: Surface};
   _resourceManager: ResourceManager<Image>;
   _videoPlayers: VideoPlayerManager;
+  _anaglyphEffect: AnaglyphEffect;
 
   constructor(frame: HTMLElement, scene: THREE.Scene) {
     this._frame = frame;
@@ -58,12 +63,21 @@ export default class Compositor {
       0.1,
       2000,
     );
+    this._camera.layers.enable(1);
+    this._camera.layers.enable(2);
+
     this._renderer = new THREE.WebGLRenderer({
       antialias: true,
+      preserveDrawingBuffer: true
     });
-    this._canvas = this._renderer.domElement;
+    //this._renderer.autoClear = false;
     this._renderer.setPixelRatio(window.devicePixelRatio);
     this._renderer.setSize(frame.clientWidth, frame.clientHeight);
+
+    this._canvas = this._renderer.domElement;
+
+    this._anaglyphEffect = new AnaglyphEffect(this._renderer, frame.clientWidth, frame.clientHeight);
+
     frame.appendChild(this._renderer.domElement);
     this._scene = scene;
 
@@ -154,12 +168,14 @@ export default class Compositor {
   resize(width: number, height: number, pixelRatio: number = 1) {
     this._renderer.setPixelRatio(pixelRatio);
     this._renderer.setSize(width, height, false);
+    this._anaglyphEffect.setSize(width, height);
   }
 
   resizeCanvas(width: number, height: number) {
     this._camera.aspect = width / height;
     this._camera.updateProjectionMatrix();
     this._renderer.setSize(width, height, true);
+    this._anaglyphEffect.setSize(width, height);
   }
 
   prepareForRender(eye: ?string) {
@@ -190,27 +206,61 @@ export default class Compositor {
     this._cursor.setPosition(cameraToCursorX, cameraToCursorY, cameraToCursorZ);
   }
 
-  render(position: Vec3, quat: Quaternion) {
+  render(position: Vec3, quat: Quaternion, prepareForRenderCallback) {
     this.prepareForRender(null);
     this._camera.position.set(position[0], position[1], position[2]);
     this._camera.quaternion.set(quat[0], quat[1], quat[2], quat[3]);
 
-    this._renderer.render(this._scene, this._camera);
+    //prepareForRenderCallback("left");
+    //this._renderer.render(this._scene, this._camera);
+    this.renderAnaglyph(this._scene, this._camera, prepareForRenderCallback);
   }
 
-  renderSurface(surface: Surface) {
-    this._renderer.render(surface.getScene(), surface.getCamera());
+  renderSurface(surface: Surface, prepareForRenderCallback) {
+    //this._renderer.render(surface.getScene(), surface.getCamera());
+    this.renderAnaglyph(surface.getScene(), surface.getCamera(), prepareForRenderCallback);
   }
 
-  renderVR(display: VRDisplay, frameData: VRFrameData) {
+  runtimeRenderNormal(renderer, scene, camera, renderTarget){
+    if(renderTarget){
+      renderer.render(scene, camera, renderTarget, true);
+    } else {
+      renderer.render(scene, camera);
+    }
+  }
+
+  renderAnaglyph(scene,camera,prepareForRenderCallback){
+    const preserveAutoUpdate = this._scene.autoUpdate;
+    const size = this._renderer.getSize();
+
+    if (preserveAutoUpdate) {
+      this._scene.updateMatrixWorld();
+      this._scene.autoUpdate = false;
+    }
+
+    this._renderer.setScissorTest(true);
+    camera.updateMatrixWorld();
+
+    this._renderer.setViewport(0,0,size.width,size.height);
+    this._renderer.setScissor(0,0,size.width,size.height);
+    this._anaglyphEffect.render(scene,camera,prepareForRenderCallback);
+    this._renderer.setScissorTest(false);
+
+    if (preserveAutoUpdate) {
+      this._scene.autoUpdate = true;
+    }
+  }
+
+  renderVR(display: VRDisplay, frameData: VRFrameData, prepareForRenderCallback) {
     const preserveAutoUpdate = this._scene.autoUpdate;
     if (preserveAutoUpdate) {
       this._scene.updateMatrixWorld();
       this._scene.autoUpdate = false;
     }
 
+    //this._renderer.clear();
+
     const size = this._renderer.getSize();
-    this._renderer.setScissorTest(true);
     this._camera.updateMatrixWorld();
 
     leftCamera.matrixWorldInverse.fromArray(frameData.leftViewMatrix);
@@ -226,6 +276,10 @@ export default class Compositor {
     const h = size.height;
 
     this.prepareForRender(LEFT);
+    if(prepareForRenderCallback){
+      prepareForRenderCallback(LEFT);
+    }
+    this._renderer.setScissorTest(true);
     this._renderer.setViewport(x, y, w, h);
     this._renderer.setScissor(x, y, w, h);
     this._renderer.render(this._scene, leftCamera);
@@ -233,6 +287,10 @@ export default class Compositor {
     x = w;
 
     this.prepareForRender(RIGHT);
+    if(prepareForRenderCallback){
+      prepareForRenderCallback(RIGHT);
+    }
+    this._renderer.setScissorTest(true);
     this._renderer.setViewport(x, y, w, h);
     this._renderer.setScissor(x, y, w, h);
     this._renderer.render(this._scene, rightCamera);

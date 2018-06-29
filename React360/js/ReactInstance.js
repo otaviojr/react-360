@@ -65,12 +65,9 @@ export type React360Options = {
   customOverlay?: OverlayInterface,
   customViews?: Array<CustomView>,
   executor?: ReactExecutor,
-  frame?: number => mixed,
   fullScreen?: boolean,
   nativeModules?: Array<Module | NativeModuleInitializer>,
 };
-
-const DEFAULT_SURFACE_DEPTH = 4;
 
 /**
  * New top-level class for the panel-first design of React 360 aligned with
@@ -87,7 +84,6 @@ export default class ReactInstance {
   _events: Array<InputEvent>;
   _focused2DSurface: null | Surface;
   _frameData: ?VRFrameData;
-  _frameHook: ?(number) => mixed;
   _lastFrameTime: number;
   _looping: boolean;
   _needsResize: boolean;
@@ -130,7 +126,6 @@ export default class ReactInstance {
     this._nextFrame = null;
     this._lastFrameTime = 0;
     this._focused2DSurface = null;
-    this._frameHook = options.frame;
 
     if (options.fullScreen) {
       parent.style.position = 'fixed';
@@ -310,25 +305,20 @@ export default class ReactInstance {
       this.runtime.setRays(this._rays, this._cameraPosition, this._cameraQuat);
     }
     this.runtime.queueEvents(this._events);
-    // Update each view
-    this.runtime.frame(
-      this.compositor.getCamera(),
-      this.compositor.getRenderer(),
-    );
+
     if (this._audioModule) {
       const audioModule = this._audioModule;
       audioModule._setCameraParameters(this._cameraPosition, this._cameraQuat);
       audioModule.frame(delta);
     }
-    if (this._frameHook) {
-      this._frameHook(frameStart);
-    }
+
     this.compositor.frame(delta);
     const cursorVis = this.compositor.getCursorVisibility();
-    if (cursorVis !== 'hidden' && this.runtime.isCursorActive()) {
+    if (
+      cursorVis === 'visible' ||
+      (cursorVis === 'auto' && this.runtime.isCursorActive())
+    ) {
       this.compositor.updateCursor(this._rays, this.runtime.getCursorDepth());
-    } else if (cursorVis === 'visible') {
-      this.compositor.updateCursor(this._rays, DEFAULT_SURFACE_DEPTH);
     } else {
       this.compositor.updateCursor(null, 0);
     }
@@ -338,7 +328,20 @@ export default class ReactInstance {
     this.compositor.setMouseCursorActive(this.runtime.isMouseCursorActive());
 
     if (display && display.isPresenting && frameData) {
-      this.compositor.renderVR(display, frameData);
+
+      this.compositor.renderVR(display, frameData, (eye) => {
+        // Update each view
+        this.runtime.frame(
+          this.compositor.getCamera(),
+          this.compositor.getRenderer(),
+          (renderer, scene, camera, renderTarget) => {
+            camera.layers.set(0);
+            camera.layers.enable( (eye==="left" ? 1 : 2) );
+              this.compositor.runtimeRenderNormal(renderer, scene, camera, renderTarget);
+          }
+        );
+      });
+
       if (this._looping) {
         // Avoid reallocating objects each frame
         if (this._nextFrame) {
@@ -353,7 +356,18 @@ export default class ReactInstance {
         }
       }
     } else if (this._focused2DSurface) {
-      this.compositor.renderSurface(this._focused2DSurface);
+      this.compositor.renderSurface(this._focused2DSurface, (eye) => {
+        // Update each view
+        this.runtime.frame(
+          this.compositor.getCamera(),
+          this.compositor.getRenderer(),
+          (renderer, scene, camera, renderTarget) => {
+            camera.layers.set(0);
+            camera.layers.enable( (eye==="left" ? 1 : 2) );
+            this.compositor.runtimeRenderNormal(renderer, scene, camera, renderTarget);
+          }
+        );
+      });
       if (this._looping) {
         if (this._nextFrame) {
           const nextFrame: any = this._nextFrame;
@@ -367,7 +381,18 @@ export default class ReactInstance {
         }
       }
     } else {
-      this.compositor.render(this._cameraPosition, this._cameraQuat);
+      this.compositor.render(this._cameraPosition, this._cameraQuat, (eye) => {
+        // Update each view
+        this.runtime.frame(
+          this.compositor.getCamera(),
+          this.compositor.getRenderer(),
+          (renderer, scene, camera, renderTarget) => {
+              camera.layers.set(0);
+              camera.layers.enable( (eye==="left" ? 1 : 2) );
+              this.compositor.runtimeRenderNormal(renderer, scene, camera, renderTarget);
+          }
+        );
+      });
       if (this._looping) {
         // Avoid reallocating objects each frame
         if (this._nextFrame) {
@@ -535,21 +560,5 @@ export default class ReactInstance {
    */
   getAssetURL(localPath: string): string {
     return this._assetRoot + localPath;
-  }
-
-  /**
-   * Get the current camera position as a 3-dimensional vector. Changing the
-   * values of this array can have unexpected effects.
-   */
-  getCameraPosition(): Vec3 {
-    return this._cameraPosition;
-  }
-
-  /**
-   * Get the current camera rotation as a quaternion. Changing the values of
-   * this array can have unexpected effects.
-   */
-  getCameraQuaternion(): Quaternion {
-    return this._cameraQuat;
   }
 }
