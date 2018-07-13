@@ -397,11 +397,11 @@ export default class ReactInstance {
         // Avoid reallocating objects each frame
         if (this._nextFrame) {
           const nextFrame: any = this._nextFrame;
-          nextFrame.vr = false;
+          nextFrame.vr = true;
           nextFrame.id = requestAnimationFrame(this.frame);
         } else {
           this._nextFrame = {
-            vr: false,
+            vr: true,
             id: requestAnimationFrame(this.frame),
           };
         }

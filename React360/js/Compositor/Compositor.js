@@ -50,7 +50,8 @@ export default class Compositor {
 
   constructor(frame: HTMLElement, scene: THREE.Scene) {
     this._frame = frame;
-    this._cursorVisibility = 'auto';
+    //this._cursorVisibility = 'auto';
+    this._cursorVisibility = 'visible';
     this._isMouseCursorActive = false;
     this._defaultSurface = null;
     this._surfaces = {};
@@ -61,7 +62,7 @@ export default class Compositor {
       60,
       frame.clientWidth / frame.clientHeight,
       0.1,
-      2000,
+      10000,
     );
     this._camera.layers.enable(1);
     this._camera.layers.enable(2);
@@ -239,11 +240,15 @@ export default class Compositor {
     }
 
     this._renderer.setScissorTest(true);
-    camera.updateMatrixWorld();
+    this._camera.updateMatrixWorld();
 
     this._renderer.setViewport(0,0,size.width,size.height);
     this._renderer.setScissor(0,0,size.width,size.height);
-    this._anaglyphEffect.render(scene,camera,prepareForRenderCallback);
+    this._anaglyphEffect.render(scene,this._camera, (eye) => {
+      this.prepareForRender(eye);
+      prepareForRenderCallback(eye);
+    });
+    this._renderer.setViewport(0, 0, size.width, size.height);
     this._renderer.setScissorTest(false);
 
     if (preserveAutoUpdate) {
