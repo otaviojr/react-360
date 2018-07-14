@@ -235,6 +235,24 @@ export default class UIManager extends Module {
         return new view(guiSys);
       });
     });
+
+    this.directlyInputChannelListeners = [];
+  }
+
+  addDirectlyInputChannelListener(callback){
+    this.directlyInputChannelListeners.push(callback);
+  }
+
+  removeDirectlyInputChannelListener(callback){
+    this.directlyInputChannelListeners.remove( (item) => {
+      return item === callback;
+    });
+  }
+
+  fireDirectlyInputCannelListener(event){
+    this.directlyInputChannelListeners.forEach( (item) => {
+      item(event);
+    });
   }
 
   /**

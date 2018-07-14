@@ -10,6 +10,7 @@
  */
 
 import type {ButtonEvent, InputEvent, InputChannel} from './Types';
+import DirectEvent from '../DirectEvent';
 
 type GamepadEvent = {gamepad: Gamepad};
 
@@ -189,6 +190,7 @@ export default class GamepadInputChannel implements InputChannel {
                 event.buttonClass = buttonClass;
               }
               acc.push(event);
+              DirectEvent.fire("InputChannel",event);
             } else {
               buttonState.pressed = false;
               const event: ButtonEvent = {
@@ -202,6 +204,7 @@ export default class GamepadInputChannel implements InputChannel {
                 event.buttonClass = buttonClass;
               }
               acc.push(event);
+              DirectEvent.fire("InputChannel",event);
             }
           } else if (pressed && now - buttonState.startTime > LONG_PRESS_TIME) {
             const event: ButtonEvent = {
@@ -215,6 +218,7 @@ export default class GamepadInputChannel implements InputChannel {
               event.buttonClass = buttonClass;
             }
             acc.push(event);
+            DirectEvent.fire("InputChannel",event);
           }
         }
 

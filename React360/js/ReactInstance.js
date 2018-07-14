@@ -34,7 +34,7 @@ import AudioModule from './Modules/AudioModule';
 import EnvironmentModule from './Modules/EnvironmentModule';
 import VideoModule from './Modules/VideoModule';
 import type Module from './Modules/Module';
-import type {CustomView} from './Modules/UIManager';
+import type UIManager, {CustomView} from './Modules/UIManager';
 import Runtime, {type NativeModuleInitializer} from './Runtime/Runtime';
 import {rotateByQuaternion} from './Utils/Math';
 

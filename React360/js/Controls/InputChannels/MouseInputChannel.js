@@ -10,6 +10,7 @@
  */
 
 import type {ButtonEvent, InputEvent, InputChannel} from './Types';
+import DirectEvent from '../DirectEvent';
 
 export default class MouseInputChannel implements InputChannel {
   _batchedEvents: Array<ButtonEvent>;
@@ -34,6 +35,7 @@ export default class MouseInputChannel implements InputChannel {
       event.buttonClass = 'confirm';
     }
     this._batchedEvents.push(event);
+    DirectEvent.fire("InputChannel", event);
   }
 
   _onMouseUp(e: MouseEvent) {
@@ -47,6 +49,7 @@ export default class MouseInputChannel implements InputChannel {
       event.buttonClass = 'confirm';
     }
     this._batchedEvents.push(event);
+    DirectEvent.fire("InputChannel", event);
   }
 
   getEvents(acc: Array<InputEvent>): void {

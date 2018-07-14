@@ -10,6 +10,7 @@
  */
 
 import type {ButtonEvent, InputEvent, InputChannel} from './Types';
+import DirectEvent from '../DirectEvent';
 
 export default class TouchInputChannel implements InputChannel {
   _batchedEvents: Array<ButtonEvent>;
@@ -33,6 +34,7 @@ export default class TouchInputChannel implements InputChannel {
       buttonClass: 'confirm',
     };
     this._batchedEvents.push(event);
+    DirectEvent.fire("InputChannel", event);
   }
 
   _onTouchEnd(e: TouchEvent) {
@@ -44,6 +46,7 @@ export default class TouchInputChannel implements InputChannel {
       buttonClass: 'confirm',
     };
     this._batchedEvents.push(event);
+    DirectEvent.fire("InputChannel", event);
   }
 
   getEvents(acc: Array<InputEvent>): void {
